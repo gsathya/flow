@@ -1,3 +1,5 @@
 traceroute-data.db
 *.pyc
 .DS_STORE
+data.json
+GeoLiteCity.dat
