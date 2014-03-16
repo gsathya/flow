@@ -1,6 +1,7 @@
 import sqlite3
 import pygeoip
 import json
+import sys
 
 def is_private(address):
   """
@@ -24,14 +25,14 @@ def is_private(address):
 
   return False
 
-def process_db():
+def dumpjson(filename, query):
     gi = pygeoip.GeoIP('GeoLiteCity.dat')
-    conn = sqlite3.connect('traceroute-data.db')
+    conn = sqlite3.connect('../data/' + filename)
     conn.row_factory = sqlite3.Row
 
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM traceroute LIMIT 100")
+    cur.execute(query)
 
     rows = cur.fetchall()
 
@@ -81,6 +82,21 @@ def process_db():
 
     print data
     conn.close()
+
+def process_db():
+    args = sys.argv
+    if(len(args) < 3):
+      print "Format: db.py [OPTION -d OR -m] [\"QUERY\"]"
+      print "Example: db.py -d \"SELECT * FROM traceroute LIMIT 100\""
+      sys.exit(-1)
+    query = args[2]
+    if(args[1]=="-d"):
+      dumpjson('smalldata.db', query)
+    elif(args[1]=="-m"):
+      dumpjson('largedata.db', query)
+    else:
+      print "Invalid option"
+      sys.exit(-1)
 
 if __name__ == "__main__":
     process_db()
