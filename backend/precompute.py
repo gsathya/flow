@@ -31,12 +31,12 @@ def precompute_monthly_db(inputFilename, outputFilename):
     """
     get_groups = ("SELECT sub.hop, sub.deviceid, sub.eventstamp, sub.ip, sub.rtt "
                   "FROM traceroute sub, traceroute prev WHERE prev.ip = ? "
-                  "AND prev.hop = ? and sub.hop = ? AND toolid= 'paris-traceroute' "
-                  "AND prev.eventstamp = sub.eventstamp ORDER BY ip, eventstamp ")
+                  "AND prev.hop = ? and sub.hop = ? AND sub.toolid= 'paris-traceroute' "
+                  "AND prev.eventstamp = sub.eventstamp ORDER BY sub.ip, sub.eventstamp ")
     get_persistence_data = ("SELECT sub.ip, sub.eventstamp FROM traceroute sub, "
                             "traceroute prev WHERE prev.ip = ? AND prev.hop = ? "
-                            "AND sub.hop = ? AND toolid = 'paris-traceroute' AND "
-                            "prev.eventstamp = sub.eventstamp ORDER BY eventstamp")
+                            "AND sub.hop = ? AND sub.toolid = 'paris-traceroute' AND "
+                            "prev.eventstamp = sub.eventstamp ORDER BY sub.eventstamp")
     insert_data = ("INSERT into monthlyData (deviceid, srcip, dstip, hop, vertex_ip1, "
                    "vertex_ip2, avg_rtt real, prevalence real, persistence real) VALUES "
                    "(%(deviceid)s, %(srcip)s, %(dstip)s, %(hop)s, %(vertex_ip1)s, "
@@ -45,23 +45,26 @@ def precompute_monthly_db(inputFilename, outputFilename):
     # db = dbhash.open(inputFilename)
     db = sqlite3.connect(inputFilename)
     outputDB = sqlite3.connect(outputFilename)
-    cursor = outputDB.cursor()
+    cursor = db.cursor()
 
     # iterate over all unique paths
     cursor.execute("SELECT distinct srcip from traceroute")
     srcIPs = cursor.fetchall()
     cursor.execute("SELECT distinct dstip from traceroute")
     destIPs = cursor.fetchall()
-    for start in srcIPs:
-        for dest in destIPs:
+    print "starting up"
+    for (start,) in srcIPs:
+        for (dest,) in destIPs:
+            print "Starting path {} {}".format(start, dest)
             # get all the distinct hops as a first step to getting all
             # the previous ips
-            cursor.execute("SELECT MAX(hop) from traceroute WHERE scrip = ? and dstip = ?", (start, end))
-            (maxHops,) = cursor.fetchall()
+            cursor.execute("SELECT MAX(hop) from traceroute WHERE srcip = ? and dstip = ?", (start, dest))
+            (maxHops,) = cursor.fetchone()
             for hop in range(maxHops):
-                cursor.execute("SELECT distinct ip from traceroute WHERE scrip = ? AND dstip= ? AND hop = ?",(start, end, hop))
+                print "Starting hop {} for path {} to {}".format(hop, start, dest)
+                cursor.execute("SELECT distinct ip from traceroute WHERE srcip = ? AND dstip= ? AND hop = ?",(start, dest, hop))
                 prevHopIPs = [ip for (ip,) in cursor.fetchall()]
-                for prevHopIP in prevHopIPS:
+                for prevHopIP in prevHopIPs:
                 # for each hop, find all of the next hops
                     cursor.execute(get_groups, (prevHopIP, hop, hop+1))
                     # get the data for all of the subsequent IPs
@@ -78,7 +81,7 @@ def precompute_monthly_db(inputFilename, outputFilename):
                             if rttGroup != None:
                                 rtts.append(rttGroup)
                                 info.append({'hop':hop, 'router':router, 'vertex_ip1':prevHopIP, 
-                                             'vertex_ip2':ip, 'srcip':start, 'dstip':end]
+                                             'vertex_ip2':ip, 'srcip':start, 'dstip':dest})
                             rttGroup = [rtt]
                         else:
                             rttGroup.append(rtt)
@@ -126,5 +129,5 @@ def create_table(filename):
     outputDB.close()
 
 if __name__ == "__main__":
-    create_table('monthly-data.db')
-    precompute_monthly_db('traceroutes--2014-01.db', 'monthly-data.db')
+#    create_table('monthly-data.db')
+    precompute_monthly_db('sqlite-traceroute-data.db', 'monthly-data.db')
