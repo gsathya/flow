@@ -32,7 +32,7 @@ def precompute_monthly_db(inputFilename, outputFilename):
     get_groups = ("SELECT sub.hop, sub.deviceid, sub.eventstamp, sub.ip, sub.rtt "
                   "FROM traceroute sub, traceroute prev WHERE prev.ip = ? "
                   "AND prev.hop = ? and sub.hop = ? AND sub.toolid= 'paris-traceroute' "
-                  "AND prev.eventstamp = sub.eventstamp ORDER BY sub.ip, sub.eventstamp ")
+                  "AND prev.eventstamp = sub.eventstamp ORDER BY sub.eventstamp")
     get_persistence_data = ("SELECT sub.ip, sub.eventstamp FROM traceroute sub, "
                             "traceroute prev WHERE prev.ip = ? AND prev.hop = ? "
                             "AND sub.hop = ? AND sub.toolid = 'paris-traceroute' AND "
@@ -68,58 +68,54 @@ def precompute_monthly_db(inputFilename, outputFilename):
                 # for each hop, find all of the next hops
                     cursor.execute(get_groups, (prevHopIP, hop, hop+1))
                     # get the data for all of the subsequent IPs
-                    rtts = []
-                    info = []
-                    rttGroup = None
-                    prevIP = ""
-                    prevHop = -1
+                    rtts = {}
+                    info = {}
+                    startEventstamps = {}
+                    lengths = {}
+                    seenIPs = {}
+                    inPrevRun = {}
+                    curEventstamp = None
                     totalElems = 0
+                    # try to compute the prevalence, persistence, and avg rtt in one pass
                     for (hop, router, eventstamp, ip, rtt) in cursor.fetchall():
-                        if hop != prevHop or prevIP != ip:
-                            prevHop = hop
-                            prevIP = ip
-                            if rttGroup != None:
-                                rtts.append(rttGroup)
-                                info.append({'hop':hop, 'router':router, 'vertex_ip1':prevHopIP, 
-                                             'vertex_ip2':ip, 'srcip':start, 'dstip':dest})
-                            rttGroup = [rtt]
-                        else:
-                            rttGroup.append(rtt)
+                        # if we are at the end of an eventstamp, set
+                        # IPs as either in the eventstamp or not
+                        if curEventstamp != eventstamp and eventstamp != None:
+                            # go over all of the ips that are currently in the run and see if this is the end of their run
+                            for key in inPrevRun.keys():
+                                # if this is the end of a run, then mark it as no longer being a run and add the length onto lengths
+                                if key not in seenIPs:
+                                    if ip in lengths:
+                                        lengths[ip].append(curEventstamp-startEventstamps[ip])
+                                    else:
+                                        lengths[ip] = [curEventstamp-startEventstamps[ip]]
+                                    del inPrevRun[ip]
+                                    del startEventstamps[ip]
+                            # make sure that we mark every element we have seen in this eventstamp as in being in this eventstamp
+                            for key in seenIPs.keys():
+                                inPrevRun[ip] = True
+                                if key not in startEventstamp:
+                                    startEventstamp[ip] = curEventstamp
+                            seenIPs = {}
+                            curEventstamp = eventstamp
+                        seenIPs[ip] = True
                         totalElems += 1
+                        rtts[ip].append(rtt)
+                        if ip not in info:
+                            info[ip] = {'hop':hop, 'router':router, 'vertex_ip1':prevHopIP, 
+                                        'vertex_ip2':ip, 'srcip':start, 'dstip':dest}
+
                     # for each group, find the avg rtt
                     toInsert = []
-                    for index in range(len(rtts)):
-                        avgRtt = stats.nanmean(rtts[index])
-                        info[index]['avg_rtt'] = avgRtt
-                        prevalence = float(len(rtts[index])) / float(totalElems)
-                        info[index]['prevalence'] = prevalence
-                        toInsert.append(info[index])
-                    cursor.execute(get_persistence_data, (prevIP, hop, hop+1))
-                    data = cursor.fetchall()
-                    for index in range(len(toInsert)):
-                        testIP = toInsert[index]['vertex_ip2']
-                        runs = []
-                        startEventstamp = data[0][0]
-                        inPrevRun = False
-                        curEventstamp = data[0][0]
-                        seenIP = False
-                        for (ip, eventstamp) in data:
-                            if eventstamp != curEventstamp:
-                                if seenIP == True:
-                                    if inPrevRun == False:
-                                        startEventstamp = eventstamp
-                                else:
-                                    # if there is a run to compute, then compute it
-                                    if inPrevRun == True:
-                                        runs.append(curEventstamp -startEventstamp)
-                                    inPrevRun = False
-                                curEventstamp = eventstamp
-                                seenIP = False
-                            if ip == testIP:
-                                seenIP = True
-                        persistence = stats.nanmean(runs)
-                        toInsert[index]['persistence'] = persistence
-                        cursor.execute(insert_data, toInsert[index])
+                    for ip in rtts.keys():
+                        avgRtt = stats.nanmean(rtts[ip])
+                        info[ip]['avg_rtt'] = avgRtt
+                        prevalence = float(len(rtts[ip])) / float(totalElems)
+                        info[ip]['prevalence'] = prevalence
+                        persistence = stats.nanmean(lengths[ip])
+                        info[ip]['persistence'] = persistence
+                        cursor.execute(insert_data, info[ip])
+                db.commit()    
 
 def create_table(filename):
     outputDB = sqlite3.connect(filename)
