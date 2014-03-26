@@ -3,3 +3,5 @@ traceroute-data.db
 .DS_STORE
 data.json
 GeoLiteCity.dat
+*~
+*.db
