@@ -31,42 +31,58 @@ def precompute_monthly_db(inputFilename, outputFilename):
     """
     get_groups = ("SELECT sub.hop, sub.deviceid, sub.eventstamp, sub.ip, sub.rtt "
                   "FROM traceroute sub, traceroute prev WHERE prev.ip = ? "
-                  "AND prev.hop = ? and sub.hop = ? AND sub.toolid= 'paris-traceroute' "
+                  "AND prev.hop = ? and sub.hop = ? AND prev.srcip = sub.srcip "
+                  "AND prev.dstip = sub.dstip AND sub.srcip = ? AND sub.dstip = ? "
                   "AND prev.eventstamp = sub.eventstamp ORDER BY sub.eventstamp")
+    get_first_hop_groups = ("SELECT sub.hop, sub.deviceid, sub.eventstamp, sub.ip, sub.rtt "
+                            "FROM traceroute sub WHERE sub.hop = ? AND srcip = ? AND dstip = ? ORDER BY sub.eventstamp")
+
     get_persistence_data = ("SELECT sub.ip, sub.eventstamp FROM traceroute sub, "
                             "traceroute prev WHERE prev.ip = ? AND prev.hop = ? "
                             "AND sub.hop = ? AND sub.toolid = 'paris-traceroute' AND "
                             "prev.eventstamp = sub.eventstamp ORDER BY sub.eventstamp")
     insert_data = ("INSERT into monthlyData (deviceid, srcip, dstip, hop, vertex_ip1, "
-                   "vertex_ip2, avg_rtt real, prevalence real, persistence real) VALUES "
-                   "(%(deviceid)s, %(srcip)s, %(dstip)s, %(hop)s, %(vertex_ip1)s, "
-                   "%(vertex_ip2)s, %(avg_rtt)s, %(prevalence)s, %(persistence)s)")
+                   "vertex_ip2, avg_rtt, prevalence, persistence) VALUES "
+                   "(?, ?, ?, ?, ?, ?, ?, ?, ?)")
+
     # setup the database connections
     # db = dbhash.open(inputFilename)
     db = sqlite3.connect(inputFilename)
     outputDB = sqlite3.connect(outputFilename)
     cursor = db.cursor()
+    outputCursor = outputDB.cursor()
 
     # iterate over all unique paths
-    cursor.execute("SELECT distinct srcip from traceroute")
-    srcIPs = cursor.fetchall()
-    cursor.execute("SELECT distinct dstip from traceroute")
-    destIPs = cursor.fetchall()
-    print "starting up"
-    for (start,) in srcIPs:
-        for (dest,) in destIPs:
+    cursor.execute("SELECT distinct srcip, dstip from traceroute")
+    ips = cursor.fetchall()
+    # cursor.execute("SELECT distinct srcip from traceroute")
+    # srcIPs = cursor.fetchall()
+    # cursor.execute("SELECT distinct dstip from traceroute")
+    # destIPs = cursor.fetchall()
+    # print "starting up"
+    # for (start,) in srcIPs:
+    #     for (dest,) in destIPs:
+    for (start, dest) in ips:
             print "Starting path {} {}".format(start, dest)
             # get all the distinct hops as a first step to getting all
             # the previous ips
             cursor.execute("SELECT MAX(hop) from traceroute WHERE srcip = ? and dstip = ?", (start, dest))
             (maxHops,) = cursor.fetchone()
-            for hop in range(maxHops):
+            # TODO: fix this so that it correctly gets the first elem
+            for hop in range(1, maxHops):
                 print "Starting hop {} for path {} to {}".format(hop, start, dest)
-                cursor.execute("SELECT distinct ip from traceroute WHERE srcip = ? AND dstip= ? AND hop = ?",(start, dest, hop))
-                prevHopIPs = [ip for (ip,) in cursor.fetchall()]
+                # if this is the first hop, we have to treat it differently
+                if hop == 1:
+                    prevHopIPs = [start]
+                else:
+                    cursor.execute("SELECT distinct ip from traceroute WHERE srcip = ? AND dstip= ? AND hop = ?",(start, dest, hop))
+                    prevHopIPs = [ip for (ip,) in cursor.fetchall()]
                 for prevHopIP in prevHopIPs:
                 # for each hop, find all of the next hops
-                    cursor.execute(get_groups, (prevHopIP, hop, hop+1))
+                    if hop == 1:
+                        cursor.execute(get_first_hop_groups, (hop, start, dest))
+                    else:
+                        cursor.execute(get_groups, (prevHopIP, hop, hop+1, start, dest))
                     # get the data for all of the subsequent IPs
                     rtts = {}
                     info = {}
@@ -80,7 +96,7 @@ def precompute_monthly_db(inputFilename, outputFilename):
                     for (hop, router, eventstamp, ip, rtt) in cursor.fetchall():
                         # if we are at the end of an eventstamp, set
                         # IPs as either in the eventstamp or not
-                        if curEventstamp != eventstamp and eventstamp != None:
+                        if curEventstamp != eventstamp and curEventstamp != None:
                             # go over all of the ips that are currently in the run and see if this is the end of their run
                             for key in inPrevRun.keys():
                                 # if this is the end of a run, then mark it as no longer being a run and add the length onto lengths
@@ -94,28 +110,39 @@ def precompute_monthly_db(inputFilename, outputFilename):
                             # make sure that we mark every element we have seen in this eventstamp as in being in this eventstamp
                             for key in seenIPs.keys():
                                 inPrevRun[ip] = True
-                                if key not in startEventstamp:
-                                    startEventstamp[ip] = curEventstamp
+                                if key not in startEventstamps:
+                                    startEventstamps[ip] = curEventstamp
                             seenIPs = {}
                             curEventstamp = eventstamp
                         seenIPs[ip] = True
                         totalElems += 1
-                        rtts[ip].append(rtt)
+                        if ip in rtts:
+                            rtts[ip].append(rtt)
+                        else:
+                            rtts[ip] = [rtt]
                         if ip not in info:
                             info[ip] = {'hop':hop, 'router':router, 'vertex_ip1':prevHopIP, 
                                         'vertex_ip2':ip, 'srcip':start, 'dstip':dest}
 
                     # for each group, find the avg rtt
-                    toInsert = []
                     for ip in rtts.keys():
+                        if ip == u'*':
+                            continue
                         avgRtt = stats.nanmean(rtts[ip])
                         info[ip]['avg_rtt'] = avgRtt
                         prevalence = float(len(rtts[ip])) / float(totalElems)
                         info[ip]['prevalence'] = prevalence
-                        persistence = stats.nanmean(lengths[ip])
+                        if ip in lengths:
+                            persistence = stats.nanmean(lengths[ip])
+                        else:
+                            persistence = "n/a"
                         info[ip]['persistence'] = persistence
-                        cursor.execute(insert_data, info[ip])
-                db.commit()    
+                        outputCursor.execute(insert_data, (info[ip]['router'], info[ip]['srcip'], info[ip]['dstip'], info[ip]['hop'], info[ip]['vertex_ip1'], info[ip]['vertex_ip2'], info[ip]['avg_rtt'], info[ip]['prevalence'], info[ip]['persistence']))
+                outputDB.commit()
+    outputDB.commit()
+    outputDB.close()
+    db.close()
+
 
 def create_table(filename):
     outputDB = sqlite3.connect(filename)
@@ -125,5 +152,6 @@ def create_table(filename):
     outputDB.close()
 
 if __name__ == "__main__":
-#    create_table('monthly-data.db')
-    precompute_monthly_db('sqlite-traceroute-data.db', 'monthly-data.db')
+    create_table('monthly-data.db')
+#    precompute_monthly_db('sqlite-traceroute-data.db', 'monthly-data.db')
+    precompute_monthly_db('one-router.db', 'monthly-data.db')
