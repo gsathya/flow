@@ -96,7 +96,7 @@ def split_data_into_diff_tables(conn, filestub):
                 storeDB.commit()
                 numUncommitted = 0
         numRouters += 1
-        print "Finished {} routers".format(totRouter)
+        print "Finished {} routers".format(numRouters)
         storeDB.close()
         fileNum += 1
         dbName = filestub + str(fileNum)
