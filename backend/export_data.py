@@ -68,10 +68,47 @@ def create_table(conn):
     conn.execute(create_table_query)
     conn.commit()
 
+def split_data_into_diff_tables(conn, filestub):
+    """Split the data into tables of 10 routers each so that we can
+    compute the prevalence and persistence in parallel
+
+    """
+    get_data = ("SELECT * from traceroute WHERE deviceid = ?")
+    get_routers = ("SELECT distinct deviceid from traceroute")
+    insert_data = ("INSERT into traceroute (deviceid,eventstamp,srcip,dstip,toolid,hop,ip,rtt) "
+                   "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+    cursor = conn.cursor()
+    cursor.execute(get_routers)
+    fileNum = 0
+    dbName = filestub + str(fileNum) + ".db"
+    storeDB = sqlite3.connect(dbName)
+    create_table(storeDB)
+    store = storeDB.cursor()
+    routers = cursor.fetchall()
+    numUncommitted = 0
+    numRouters = 0
+    for (router,) in routers:
+        cursor.execute(get_data,(router,))
+        for entry in cursor.fetchall():
+            store.execute(insert_data, entry)
+            numUncommitted += 1
+            if numUncommitted > 100:
+                storeDB.commit()
+                numUncommitted = 0
+        numRouters += 1
+        print "Finished {} routers".format(totRouter)
+        storeDB.close()
+        fileNum += 1
+        dbName = filestub + str(fileNum)
+        storeDB = sqlite3.connect(dbName)
+        create_table(storeDB)
+        store = storeDB.cursor()
+
 if __name__ == "__main__":
     conn = sqlite3.connect('sqlite-traceroute-data.db')
 #    create_table(conn)
 #    export_day('2014-01-01', conn)
-    export_all(conn)
-    conn.commit()
+#    export_all(conn)
+#    conn.commit()
+    split_data_into_diff_tables(conn, "monthly-data-split-")
     conn.close()
