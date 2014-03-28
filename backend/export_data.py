@@ -99,7 +99,7 @@ def split_data_into_diff_tables(conn, filestub):
         print "Finished {} routers".format(numRouters)
         storeDB.close()
         fileNum += 1
-        dbName = filestub + str(fileNum)
+        dbName = filestub + str(fileNum) + ".db"
         storeDB = sqlite3.connect(dbName)
         create_table(storeDB)
         store = storeDB.cursor()
