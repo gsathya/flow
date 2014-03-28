@@ -9,7 +9,7 @@
 
 import cPickle
 import dbhash
-from multiprocessing import pool
+from multiprocessing import Pool
 import os
 from scipy import stats
 import sqlite3
@@ -85,6 +85,8 @@ def precompute_monthly_db(inputFilename, outputFilename):
                         cursor.execute(get_first_hop_groups, (hop, start, dest))
                     else:
                         cursor.execute(get_groups, (prevHopIP, hop, hop+1, start, dest))
+                    if prevHopIP == "*":
+                        continue
                     # get the data for all of the subsequent IPs
                     rtts = {}
                     info = {}
@@ -169,10 +171,8 @@ def concurrent_precomputation(filestub, final_output):
 
     """
     insert_data = ("INSERT into monthlyData (deviceid, srcip, dstip, hop, vertex_ip1, "
-                   "vertex_ip2, avg_rtt real, prevalence real, persistence real) VALUES "
-                   "(%(deviceid)s, %(srcip)s, %(dstip)s, %(hop)s, %(vertex_ip1)s, "
-                   "%(vertex_ip2)s, %(avg_rtt)s, %(prevalence)s, %(persistence)s)")
-
+                   "vertex_ip2, avg_rtt, prevalence, persistence) VALUES "
+                   "(?, ?, ?, ?, ?, ?, ?, ?, ?)")
     # create a pool of processes to run from
     pool = Pool(processes = 64)
 
@@ -181,12 +181,13 @@ def concurrent_precomputation(filestub, final_output):
     for filename in os.listdir("."):
         # if this is a database file, then queue it for computation
         if filestub in filename:
-            inputDB = filestub
-            outputDB = filestub[:-3] + "output.db"
+            inputDB = filename
+            outputDB = filename[:-3] + "-output.db"
             outputDBs.append(outputDB)
             create_table(outputDB)
-            pool.apply_async(precompute_monthly_db, [inputDB, outputDB, print_complete])
-
+            pool.apply_async(precompute_monthly_db, [inputDB, outputDB])
+    pool.close()
+    pool.join()
     # coalesce all of the individual results into 1 db
     outputConn = sqlite3.connect(final_output)
     output = outputConn.cursor()
@@ -198,13 +199,14 @@ def concurrent_precomputation(filestub, final_output):
         for entry in inputCursor.fetchall():
             output.execute(insert_data, entry)
         inputDB.close()
-        output.commit()
+        outputConn.commit()
         numDBs += 1
         print "Coalesced {} dbs".format(numDBs)
+    outputConn.close()
 
-    # run the computation on each of the router's dbs
-    pool.apply_async()
 if __name__ == "__main__":
     create_table('monthly-data.db')
-#    precompute_monthly_db('sqlite-traceroute-data.db', 'monthly-data.db')
-    precompute_monthly_db('one-router.db', 'monthly-data.db')
+    # precompute_monthly_db('sqlite-traceroute-data.db', 'monthly-data.db')
+    # precompute_monthly_db('one-router.db', 'monthly-data.db')
+    concurrent_precomputation('monthly-data-split-','monthly-data.db')
+    
