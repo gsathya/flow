@@ -2,6 +2,8 @@ import sqlite3
 import pygeoip
 import json
 import sys
+import bsddb3 
+import dbhash
 
 def is_private(address):
   """
@@ -25,7 +27,7 @@ def is_private(address):
 
   return False
 
-def dumpjson(filename, query):
+def getsqlite(filename, query):
     gi = pygeoip.GeoIP('GeoLiteCity.dat')
     conn = sqlite3.connect('../data/' + filename)
     conn.row_factory = sqlite3.Row
@@ -43,7 +45,7 @@ def dumpjson(filename, query):
     for row in rows:
         # new path
         if row["hop"] == 1:
-            # add prev path to our list
+          # add prev path to our list
             if path:
                 # dest should be added at the end
                 if dest and path[-1] != dest:
@@ -76,27 +78,46 @@ def dumpjson(filename, query):
             path.append(dest)
         paths.append(path)
 
-    with open("data.json", 'w') as fh:
-        data = {'paths': paths}
-        json.dump(data, fh)
-
-    print data
     conn.close()
 
-def process_db():
-    args = sys.argv
-    if(len(args) < 3):
-      print "Format: db.py [OPTION -d OR -m] [\"QUERY\"]"
-      print "Example: db.py -d \"SELECT * FROM traceroute LIMIT 100\""
-      sys.exit(-1)
-    query = args[2]
-    if(args[1]=="-d"):
-      dumpjson('smalldata.db', query)
-    elif(args[1]=="-m"):
-      dumpjson('largedata.db', query)
-    else:
-      print "Invalid option"
-      sys.exit(-1)
+    data = {'paths': paths}
 
-if __name__ == "__main__":
-    process_db()
+    return data
+
+def getmonthlystats(srcip, dstip):
+    gi = pygeoip.GeoIP('GeoLiteCity.dat')
+
+    query = "SELECT * FROM monthlyData WHERE srcip=\"" + str(srcip) + "\" AND dstip=\"" + str(dstip) + "\""
+
+    print "Query: " + query
+
+    conn = sqlite3.connect('../data/monthlystats.db')
+    conn.row_factory = sqlite3.Row
+
+    cur = conn.cursor()
+    cur.execute(query)
+    rows = cur.fetchall()
+
+    result = {}
+    avg_rtt = []
+    prevalence = []
+    persistence = []
+
+    for row in rows:
+      avg_rtt.append(row["avg_rtt"])
+      prevalence.append(row["prevalence"])
+      persistence.append(row["persistence"])
+
+    result["avg_rtt"] = avg_rtt
+    result["prevalence"] = prevalence
+    result["persistence"] = persistence
+
+    return result
+
+def process_db(query, flag):
+  if(flag == "daily"):
+    return getsqlite("smalldata.db", query)
+  elif(flag == "monthly"):
+    return getsqlite("largedata.db", query)
+  print "Invalid flag"
+  return -1

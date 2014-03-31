@@ -1,17 +1,25 @@
-from flask import Flask, json, jsonify
+from flask import Flask, json, jsonify, request
 import db
-import json
 
 app = Flask(__name__)
     
-@app.route("/")
-def hello():
-    with open("data.json") as fh:
-        data = json.load(fh)
-
+@app.route("/", methods=['POST'])
+def home():
+    query = request.form['query']
+    flag = request.form['type']
+    data = db.process_db(query, flag)
+    if(data == -1):
+        return "Invalid request"
     return jsonify(data)
 
+@app.route("/monthlystats", methods=['GET'])
+def get():    
+    srcip = request.args.get('srcip')
+    dstip = request.args.get('dstip')
+    data = db.getmonthlystats(srcip, dstip)
+    result = jsonify(data)
+    return result
+
 if __name__ == "__main__":
-    #db.process_db()
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')
     
