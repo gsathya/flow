@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Flow - Visualising Traceroute</title>
+        
+        <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no' />
+        
+        <link rel="stylesheet" href="css/bootstrap.css" />
+        <link rel="stylesheet" href="css/style.css" type="text/css"/>
+        <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.2/leaflet.css" />
+        
+        <script src="http://cdn.leafletjs.com/leaflet-0.7.2/leaflet.js"></script>
+    </head>
+    
+    <body>
+        <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+            <div class="container-fluid">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="#">Flow - Visualizing Traceroute</a>
+                </div>
+                <div class="navbar-collapse collapse nav-font">
+                    <ul class="nav navbar-nav">
+                        <li><a href="#">&nbsp;&nbsp;Daily</a></li>
+                        <li><a href="#">&nbsp;&nbsp;Monthly</a></li>
+                    </ul>
+                    <form class="navbar-form navbar-right" role="search" action="#" onsubmit="updateMonthlyData()" method="POST">
+                        <div class="form-group has-feedback navbar-right">
+                            <input name="searchbox" id="searchbox" type="text" placeholder="Enter MAC address" class="form-control">
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div id="container">
+            <div class="container_map fill">
+                <div id="map"></div>
+            </div>
+        </div>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+        <script src="js/flow_monthly.js"></script>
+        <script src="js/bootstrap.js"></script>
+    </body>
+</html>
