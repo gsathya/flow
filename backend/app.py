@@ -13,10 +13,18 @@ def home():
     return jsonify(data)
 
 @app.route("/monthlystats", methods=['GET'])
-def get():    
+def get():
     srcip = request.args.get('srcip')
     dstip = request.args.get('dstip')
-    data = db.getmonthlystats(srcip, dstip)
+    mac = request.args.get('mac')
+    if mac is not None:
+        data = db.getmonthlystatsformac(mac)
+    elif dstip is None:
+        data = db.getmonthlystats("122.107.200.10", "143.215.131.173")
+    #TODO: need to implement
+    #data = db.getmonthlystatsforsrcip(srcip)
+    else:
+        data = db.getmonthlystats(srcip, dstip)
     result = jsonify(data)
     return result
 
