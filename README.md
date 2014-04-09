@@ -1,12 +1,6 @@
 Visualize traceroute data 
 
-
-To use the frontend:
-
-    $ cd frontend/
-    $ python -m SimpleHTTPServer
-
-To use the backend:
+To use flow:
 
     $ cd backend/
     $ pip install flask pygeoip 
