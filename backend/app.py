@@ -1,8 +1,24 @@
-from flask import Flask, json, jsonify, request
+from flask import Flask, json, jsonify, request, render_template, send_from_directory
+import os
 import db
 
 app = Flask(__name__)
-    
+
+@app.route("/", methods=["GET"])
+def main():
+    path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'frontend'))
+    return send_from_directory(path, "index.html")
+
+@app.route("/css/<file>", methods=["GET"])
+def get_css(file):
+    path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'frontend', "css"))
+    return send_from_directory(path, file)
+
+@app.route("/js/<file>", methods=["GET"])
+def get_js(file):
+    path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'frontend', "js"))
+    return send_from_directory(path, file)
+
 @app.route("/", methods=['POST'])
 def home():
     query = request.form['query']
