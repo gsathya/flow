@@ -174,7 +174,7 @@ def concurrent_precomputation(filestub, final_output):
                    "vertex_ip2, avg_rtt, prevalence, persistence) VALUES "
                    "(?, ?, ?, ?, ?, ?, ?, ?, ?)")
     # create a pool of processes to run from
-    pool = Pool(processes = 64)
+    pool = Pool()
 
     outputDBs = []
     # find the database files in the current directory
