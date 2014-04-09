@@ -20,11 +20,16 @@ def get():
     if mac is not None:
         data = db.getmonthlystatsformac(mac)
     elif dstip is None:
-        data = db.getmonthlystats("122.107.200.10", "143.215.131.173")
-    #TODO: need to implement
-    #data = db.getmonthlystatsforsrcip(srcip)
+        data = db.getmonthlystatsforsrcip(srcip)
     else:
         data = db.getmonthlystats(srcip, dstip)
+    result = jsonify(data)
+    return result
+
+# Return a deduplicated set of src ips
+@app.route("/monthlysrc")
+def getmonthlysrc():
+    data = db.getmonthlysrc()
     result = jsonify(data)
     return result
 
