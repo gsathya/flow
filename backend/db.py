@@ -2,6 +2,7 @@ import sqlite3
 import pygeoip
 import json
 import sys
+from sets import Set
 
 def is_private(address):
     """
@@ -140,6 +141,93 @@ def getmonthlystats(srcip, dstip):
     
     return result
 
+def getmonthlystatsforsrcip(srcip):
+    
+    gi = pygeoip.GeoIP('GeoLiteCity.dat')
+    query = "SELECT * FROM monthlyData WHERE srcip=\"" + str(srcip) + "\""
+    
+    conn = sqlite3.connect('../data/monthlystats.db')
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(query)
+    rows = cur.fetchall()
+    
+    result = {}
+    temp = {}
+    avg_rtt = []
+    prevalence = []
+    persistence = []
+    vertex_ip1_lat = []
+    vertex_ip1_lng = []
+    vertex_ip2_lat = []
+    vertex_ip2_lng = []
+    hop = []
+    
+    srcloc = gi.record_by_addr(srcip)
+    result["srclat"] = srcloc['latitude']
+    result["srclng"] = srcloc['longitude']
+    
+    currentDst = ''
+    
+    for row in rows:
+        if currentDst == '':
+            currentDst = row["dstip"]
+        
+        if currentDst != row["dstip"]:
+            dstloc = gi.record_by_addr(currentDst)
+            temp["dstlat"] = dstloc['latitude']
+            temp["dstlng"] = dstloc['longitude']
+            temp["vertex_ip1_lat"] = vertex_ip1_lat
+            temp["vertex_ip1_lng"] = vertex_ip1_lng
+            temp["vertex_ip2_lat"] = vertex_ip2_lat
+            temp["vertex_ip2_lng"] = vertex_ip2_lng
+            temp["avg_rtt"] = avg_rtt
+            temp["prevalence"] = prevalence
+            temp["persistence"] = persistence
+            temp["hop"] = hop
+            result[row["dstip"]] = temp
+            currentDst = row["dstip"]
+            temp = {}
+            avg_rtt = []
+            prevalence = []
+            persistence = []
+            vertex_ip1_lat = []
+            vertex_ip1_lng = []
+            vertex_ip2_lat = []
+            vertex_ip2_lng = []
+            hop = []
+    
+        avg_rtt.append(row["avg_rtt"])
+        prevalence.append(row["prevalence"])
+        persistence.append(row["persistence"])
+        hop.append(row["hop"])
+        if is_private(row["vertex_ip1"]):
+            ip1_loc = srcloc
+        else:
+            ip1_loc = gi.record_by_addr(row["vertex_ip1"])
+        if is_private(row["vertex_ip2"]):
+            ip2_loc = srcloc
+        else:
+            ip2_loc = gi.record_by_addr(row["vertex_ip2"])
+        vertex_ip1_lat.append(ip1_loc['latitude'])
+        vertex_ip1_lng.append(ip1_loc['longitude'])
+        vertex_ip2_lat.append(ip2_loc['latitude'])
+        vertex_ip2_lng.append(ip2_loc['longitude'])
+
+    temp["dstlat"] = dstloc['latitude']
+    temp["dstlng"] = dstloc['longitude']
+    temp["vertex_ip1_lat"] = vertex_ip1_lat
+    temp["vertex_ip1_lng"] = vertex_ip1_lng
+    temp["vertex_ip2_lat"] = vertex_ip2_lat
+    temp["vertex_ip2_lng"] = vertex_ip2_lng
+    temp["avg_rtt"] = avg_rtt
+    temp["prevalence"] = prevalence
+    temp["persistence"] = persistence
+    temp["hop"] = hop
+    result[row["dstip"]] = temp
+    
+    return result
+
 def getmonthlystatsformac(mac):
     
     gi = pygeoip.GeoIP('GeoLiteCity.dat')
@@ -251,6 +339,26 @@ def getmonthlystatsformac(mac):
         finalresult[counter] = result
     
     return finalresult
+
+def getmonthlysrc():
+    
+    gi = pygeoip.GeoIP('GeoLiteCity.dat')
+    
+    query = "SELECT DISTINCT srcip FROM monthlyData"
+    conn = sqlite3.connect('../data/monthlystats.db')
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(query)
+    rows = cur.fetchall()
+    result = {}
+    for row in rows:
+        tempset = {}
+        srcloc = gi.record_by_addr(row["srcip"])
+        tempset["srclat"] = srcloc['latitude']
+        tempset["srclng"] = srcloc['longitude']
+        result[row["srcip"]] = tempset
+
+    return result
 
 def process_db(query, flag):
     if(flag == "daily"):
