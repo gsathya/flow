@@ -13,7 +13,7 @@
         <script src="http://cdn.leafletjs.com/leaflet-0.7.2/leaflet.js"></script>
     </head>
     
-    <body onload="mapMonthlyData()">
+    <body onload="loadMap()">
         <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
             <div class="container-fluid">
                 <div class="navbar-header">
@@ -21,10 +21,10 @@
                 </div>
                 <div class="navbar-collapse collapse nav-font">
                     <ul class="nav navbar-nav">
-                        <li><a href="#">&nbsp;&nbsp;Daily</a></li>
-                        <li><a href="#">&nbsp;&nbsp;Monthly</a></li>
+                        <li><a href="/daily">&nbsp;&nbsp;Daily</a></li>
+                        <li><a href="/monthly">&nbsp;&nbsp;Monthly</a></li>
                     </ul>
-                    <form class="navbar-form navbar-right" role="search" action="#" onsubmit="updateMonthlyData()" method="POST">
+                    <form class="navbar-form navbar-right" role="search" action="#" onsubmit="updateMonthlyData()" method="GET">
                         <div class="form-group has-feedback navbar-right">
                             <input name="searchbox" id="searchbox" type="text" placeholder="Enter MAC address" class="form-control">
                         </div>

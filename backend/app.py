@@ -19,23 +19,33 @@ def get_js(file):
     path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'frontend', "js"))
     return send_from_directory(path, file)
 
-@app.route("/", methods=['POST'])
-def home():
-    query = request.form['query']
-    flag = request.form['type']
-    data = db.process_db(query, flag)
-    if(data == -1):
-        return "Invalid request"
+@app.route("/tracenow")
+def tracenow():
+    path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'frontend'))
+    return send_from_directory(path, "tracenow.html")
+
+@app.route("/gettrace", methods=['GET'])
+def gettrace():
+    data = {}
     return jsonify(data)
+
+@app.route("/monthly")
+def monthly():
+    path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'frontend'))
+    return send_from_directory(path, "monthly.html")
+
+@app.route("/monthlystatsformac", methods=['GET'])
+def getmonthlystatsformac():
+    mac = request.args.get('mac')
+    data = db.getmonthlystatsformac(mac)
+    return jsonify(data);
 
 @app.route("/monthlystats", methods=['GET'])
 def get():
     srcip = request.args.get('srcip')
     dstip = request.args.get('dstip')
     mac = request.args.get('mac')
-    if mac is not None:
-        data = db.getmonthlystatsformac(mac)
-    elif dstip is None:
+    if dstip is None:
         data = db.getmonthlystatsforsrcip(srcip)
     else:
         data = db.getmonthlystats(srcip, dstip)
