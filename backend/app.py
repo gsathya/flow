@@ -38,7 +38,7 @@ def monthly():
 def getmonthlystatsformac():
     mac = request.args.get('mac')
     data = db.getmonthlystatsformac(mac)
-    return jsonify(data);
+    return jsonify(data)
 
 @app.route("/monthlystats", methods=['GET'])
 def get():
