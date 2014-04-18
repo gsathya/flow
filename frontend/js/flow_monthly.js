@@ -78,22 +78,19 @@ function get_random_color() {
     return color;
 }    
 
-function updateMonthlyData()
+function searchByMac()
 {
+    markers.clearLayers();
     var mac = document.getElementById('searchbox').value;
     var oReq = new XMLHttpRequest();
     oReq.onload = reqListener;
     function reqListener(){
 	var json = JSON.parse(this.responseText);
-	console.log(json);
 	$.each(json, function(idx, obj){
-            var lat = obj.srclat;
-            var lng = obj.srclng;
-            var marker = L.marker([lat, lng]).addTo(map);
-            marker.bindPopup("<b>" + idx + "</b><br />");
+	    // TODO parse response and plot polylines
         });
-    }
-    var url = "/monthlystatsformac?mac=" + mac;
-    oReq.open("get", url, true);
+    }	      	      
+    var params = "mac=" + mac;
+    oReq.open("get", "/monthlystats?" + params, true);
     oReq.send();
 }

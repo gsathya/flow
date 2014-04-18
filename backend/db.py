@@ -144,7 +144,7 @@ def getmonthlystats(srcip, dstip):
 def getmonthlystatsforsrcip(srcip):
     
     gi = pygeoip.GeoIP('GeoLiteCity.dat')
-    query = "SELECT * FROM monthlyData WHERE srcip=\"" + str(srcip) + "\""
+    query = "SELECT * FROM monthlyData WHERE srcip=\"" + str(srcip) + "\" ORDER BY hop ASC"
     
     conn = sqlite3.connect('../data/monthlystats.db')
     conn.row_factory = sqlite3.Row
@@ -169,6 +169,8 @@ def getmonthlystatsforsrcip(srcip):
         visited.add(currentDst)
 
         dstloc = gi.record_by_addr(currentDst)
+        dstLat = dstloc['latitude']
+        dstLng = dstloc['longitude']
 
         record = {}
         avg_rtt = []
@@ -179,11 +181,13 @@ def getmonthlystatsforsrcip(srcip):
         vertex_ip2_lat = []
         vertex_ip2_lng = []
         hopCount = 0
+        prevhop = 0
 
         for row in rows:
             dstip = row["dstip"]
             if dstip != currentDst:
                 continue
+            curhop = row["hop"]
             vertex_ip1 = row["vertex_ip1"]
             vertex_ip2 = row["vertex_ip2"]
             if is_private(vertex_ip1):
@@ -194,6 +198,24 @@ def getmonthlystatsforsrcip(srcip):
                 ip2_loc = dstloc
             else:
                 ip2_loc = gi.record_by_addr(vertex_ip2)
+            # Missing hop
+            if curhop > prevhop + 1:
+                # At the beginning
+                if prevhop == 0:
+                    vertex_ip1_lat.append(srcLat)
+                    vertex_ip1_lng.append(srcLng)
+                # Somewhere in the middle
+                else:
+                    vertex_ip1_lat.append(vertex_ip2_lat[-1])
+                    vertex_ip1_lng.append(vertex_ip2_lng[-1])
+                vertex_ip2_lat.append(ip1_loc['latitude'])
+                vertex_ip2_lng.append(ip1_loc['longitude'])                                
+                avg_rtt.append('n/a')
+                prevalence.append('n/a')
+                persistence.append('n/a')
+                hopCount = hopCount + 1
+                prevhop = curhop
+            # This hop's vertices
             vertex_ip1_lat.append(ip1_loc['latitude'])
             vertex_ip1_lng.append(ip1_loc['longitude'])
             vertex_ip2_lat.append(ip2_loc['latitude'])
@@ -201,6 +223,18 @@ def getmonthlystatsforsrcip(srcip):
             avg_rtt.append(row["avg_rtt"])
             prevalence.append(row["prevalence"])
             persistence.append(row["persistence"])
+            hopCount = hopCount + 1
+            prevhop = curhop
+
+        # Final hop is missing
+        if vertex_ip2_lat[-1] != dstLat or vertex_ip2_lng[-1] != dstLng:
+            vertex_ip1_lat.append(vertex_ip2_lat[-1])
+            vertex_ip1_lng.append(vertex_ip2_lng[-1])
+            vertex_ip2_lat.append(dstLat)
+            vertex_ip2_lng.append(dstLng)
+            avg_rtt.append('n/a')
+            prevalence.append('n/a')
+            persistence.append('n/a')
             hopCount = hopCount + 1
 
         record["dstLat"] = dstloc['latitude']
@@ -219,7 +253,7 @@ def getmonthlystatsforsrcip(srcip):
     return result
 
 def getmonthlystatsformac(mac):
-    
+   
     gi = pygeoip.GeoIP('GeoLiteCity.dat')
     query = "SELECT * FROM monthlyData WHERE deviceid=\"" + str(mac) + "\""
     print "Query: " + query

@@ -34,21 +34,14 @@ def monthly():
     path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'frontend'))
     return send_from_directory(path, "monthly.html")
 
-@app.route("/monthlystatsformac", methods=['GET'])
-def getmonthlystatsformac():
-    mac = request.args.get('mac')
-    data = db.getmonthlystatsformac(mac)
-    return jsonify(data)
-
 @app.route("/monthlystats", methods=['GET'])
 def get():
     srcip = request.args.get('srcip')
-    dstip = request.args.get('dstip')
     mac = request.args.get('mac')
-    if dstip is None:
+    if srcip is not None:
         data = db.getmonthlystatsforsrcip(srcip)
-    else:
-        data = db.getmonthlystats(srcip, dstip)
+    elif mac is not None:
+        data = db.getmonthlystatsformac(mac)
     result = jsonify(data)
     return result
 
