@@ -42,8 +42,11 @@ def daily():
 @app.route("/monthlystats", methods=['GET'])
 def get():
     srcip = request.args.get('srcip')
+    dstip = request.args.get('dstip')
     mac = request.args.get('mac')
-    if srcip is not None:
+    if dstip is not None:
+        data = db.getmonthlystats(srcip, dstip)
+    elif srcip is not None:
         data = db.getmonthlystatsforsrcip(srcip)
     elif mac is not None:
         data = db.getmonthlystatsformac(mac)
