@@ -1,10 +1,10 @@
-var map = L.map('map').setView([20, 0], 3);
+var map = L.map('map').setView([20, 0], 2);
 var osmAttr = '&copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>';
 var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 
 var tileLayer = L.tileLayer(osmUrl, {
     attribution: osmAttr,
-    maxZoom: 18
+    maxZoom: 19
 }).addTo(map);
 
 var markers = new L.FeatureGroup();
