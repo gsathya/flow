@@ -87,20 +87,18 @@ function searchByMac()
     
     function reqListener(){
         var json = JSON.parse(this.responseText);
-        var srcip, srcLat, srcLng;
+        var srcip = json.srcip;
+        var srcLat = json.srcLat;
+        var srcLng = json.srcLng;
+        var srcMarker = L.marker([srcLat, srcLng]).addTo(map);
+        srcMarker.bindPopup("<b>Source Location</b><br />MAC: " + mac + "<br />srcIP: " + srcip).openPopup();
         $.each(json, function(idx, obj){
-        if(idx == "srcip"){
-           srcip = idx;
-        }else if(idx == "srcLat"){
-           srcLat = idx;
-        }else if(idx == "srcLng"){
-           srcLng = idx;
-        }else{
+        
            var dstLat = obj.dstLat;
            var dstLng = obj.dstLng;
-           var marker = L.marker([dstLat, dstLng]);
+           var marker = L.marker([dstLat, dstLng]).addTo(map);
            marker.bindPopup("<b>" + idx + "</b><br />");
-           markers.addLayer(marker);
+           //markers.addLayer(marker);
            var hopCount = obj.hopCount;
            var pathColor = get_random_color();
            for(var i=0; i<hopCount; i++){
@@ -116,11 +114,7 @@ function searchByMac()
                polyline.bindPopup("<b>Info</b><br />Average RTT: " + obj.avg_rtt[i] + "<br />Persistence: " + obj.persistence[i] + "<br />Prevalence: " + obj.prevalence[i]);
                markers.addLayer(polyline);
             }
-        }
         });
-        var srcMarker = L.marker([srcLat, srcLng]);
-        marker.bindPopup("<b>" + srcip + "</b><br />").openPopup();
-        markers.addLayer(marker);
     }
     var params = "mac=" + mac;
     oReq.open("get", "/monthlystats?" + params, true);
