@@ -56,7 +56,7 @@ def getdailystatsforsrcip():
                 paths[count] = path
                 count+=1
             ip_info = gi.record_by_addr(row["srcip"])
-            path = [(ip_info["latitude"], ip_info["longitude"])]
+            path = [(ip_info["latitude"], ip_info["longitude"], row["srcip"])]
         
         ip = row["ip"]
         
@@ -67,12 +67,12 @@ def getdailystatsforsrcip():
         lat, lang = ip_info["latitude"], ip_info["longitude"]
         
         if path[-1] != (lat, lang):
-            path.append((lat, lang))
+            path.append((lat, lang, ip))
         
         if not dest:
             ip_info = gi.record_by_addr(ip)
             lat, lang = ip_info["latitude"], ip_info["longitude"]
-            dest = (lat, lang)
+            dest = (lat, lang, ip)
     
     # add final path that we missed
     if path:

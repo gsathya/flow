@@ -39,21 +39,25 @@ function loadMap()
 	      var json = JSON.parse(this.responseText);
         var ips = {};
         
-        console.log(json);
-        
         $.each(json, function(key, val){
-            console.log(val);
+
             for(var idx in val) {
                 path = val[idx];
-                console.log(path);
-                var start_lat = path[0][0]
-                var start_lng = path[0][1]
-	              marker.bindPopup("<b>" + idx + "</b><br />");
-                marker = L.marker([start_lat, start_lng]);
+
+                var start_lat = path[0][0];
+                var start_lng = path[0][1];
+                var ip = path[0][2];
                 
-                var end_lat = path[path.length-1][0]
-                var end_lng = path[path.length-1][1]
+                var marker = L.marker([start_lat, start_lng]);
+	              marker.bindPopup("<b>" + ip + "</b><br />");
+	              markers.addLayer(marker);
+                console.log(ip);
+                var end_lat = path[path.length-1][0];
+                var end_lng = path[path.length-1][1];
+                var ip = path[path.length-1][2];                
+
                 var marker = L.marker([end_lat, end_lng]);
+	              marker.bindPopup("<b>" + ip + "</b><br />");
 	              markers.addLayer(marker);
 
                 var pathColor = get_random_color();
