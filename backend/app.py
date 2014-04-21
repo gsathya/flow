@@ -1,4 +1,4 @@
-from flask import Flask, json, jsonify, request, render_template, send_from_directory
+from flask import Flask, json, jsonify, request, render_template, send_from_directory, url_for, redirect
 import os
 import db
 
@@ -6,8 +6,7 @@ app = Flask(__name__)
 
 @app.route("/", methods=["GET"])
 def main():
-    path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'frontend'))
-    return send_from_directory(path, "index.html")
+    return redirect(url_for("daily"))
 
 @app.route("/css/<file>", methods=["GET"])
 def get_css(file):
