@@ -26,9 +26,10 @@ def is_private(address):
     
     return False
 
-def getsqlite(filename, query):
+def getdailystatsforsrcip():
+    query = "SELECT * FROM traceroute LIMIT 400"
     gi = pygeoip.GeoIP('GeoLiteCity.dat')
-    conn = sqlite3.connect('../data/' + filename)
+    conn = sqlite3.connect('../data/dailystats.db')
     conn.row_factory = sqlite3.Row
     
     cur = conn.cursor()
@@ -37,7 +38,8 @@ def getsqlite(filename, query):
     
     rows = cur.fetchall()
     
-    paths = []
+    paths = {}
+    count = 0
     path = []
     dest = None
     
@@ -51,7 +53,8 @@ def getsqlite(filename, query):
                     path.append(dest)
                     dest = None
                 
-                paths.append(path)
+                paths[count] = path
+                count+=1
             ip_info = gi.record_by_addr(row["srcip"])
             path = [(ip_info["latitude"], ip_info["longitude"])]
         
@@ -75,8 +78,8 @@ def getsqlite(filename, query):
     if path:
         if dest and path[-1] != dest:
             path.append(dest)
-        paths.append(path)
-    
+        paths[count] = path
+
     conn.close()
     
     data = {'paths': paths}
@@ -162,6 +165,116 @@ def getmonthlystatsforsrcip(srcip):
 
     for rowOut in rows:
 
+        currentDst = rowOut["dstip"]
+
+        if currentDst in visited:
+            continue
+        visited.add(currentDst)
+
+        dstloc = gi.record_by_addr(currentDst)
+        dstLat = dstloc['latitude']
+        dstLng = dstloc['longitude']
+
+        record = {}
+        avg_rtt = []
+        prevalence = []
+        persistence = []
+        vertex_ip1_lat = []
+        vertex_ip1_lng = []
+        vertex_ip2_lat = []
+        vertex_ip2_lng = []
+        hopCount = 0
+        prevhop = 0
+
+        for row in rows:
+            dstip = row["dstip"]
+            if dstip != currentDst:
+                continue
+            curhop = row["hop"]
+            vertex_ip1 = row["vertex_ip1"]
+            vertex_ip2 = row["vertex_ip2"]
+            if is_private(vertex_ip1):
+                ip1_loc = srcloc
+            else:
+                ip1_loc = gi.record_by_addr(vertex_ip1)
+            if is_private(vertex_ip2):
+                ip2_loc = dstloc
+            else:
+                ip2_loc = gi.record_by_addr(vertex_ip2)
+            # Missing hop
+            if curhop > prevhop + 1:
+                # At the beginning
+                if prevhop == 0:
+                    vertex_ip1_lat.append(srcLat)
+                    vertex_ip1_lng.append(srcLng)
+                # Somewhere in the middle
+                else:
+                    vertex_ip1_lat.append(vertex_ip2_lat[-1])
+                    vertex_ip1_lng.append(vertex_ip2_lng[-1])
+                vertex_ip2_lat.append(ip1_loc['latitude'])
+                vertex_ip2_lng.append(ip1_loc['longitude'])                                
+                avg_rtt.append('n/a')
+                prevalence.append('n/a')
+                persistence.append('n/a')
+                hopCount = hopCount + 1
+                prevhop = curhop
+            # This hop's vertices
+            vertex_ip1_lat.append(ip1_loc['latitude'])
+            vertex_ip1_lng.append(ip1_loc['longitude'])
+            vertex_ip2_lat.append(ip2_loc['latitude'])
+            vertex_ip2_lng.append(ip2_loc['longitude'])
+            avg_rtt.append(row["avg_rtt"])
+            prevalence.append(row["prevalence"])
+            persistence.append(row["persistence"])
+            hopCount = hopCount + 1
+            prevhop = curhop
+
+        # Final hop is missing
+        if vertex_ip2_lat[-1] != dstLat or vertex_ip2_lng[-1] != dstLng:
+            vertex_ip1_lat.append(vertex_ip2_lat[-1])
+            vertex_ip1_lng.append(vertex_ip2_lng[-1])
+            vertex_ip2_lat.append(dstLat)
+            vertex_ip2_lng.append(dstLng)
+            avg_rtt.append('n/a')
+            prevalence.append('n/a')
+            persistence.append('n/a')
+            hopCount = hopCount + 1
+
+        record["dstLat"] = dstloc['latitude']
+        record["dstLng"] = dstloc['longitude']
+        record["avg_rtt"] = avg_rtt
+        record["prevalence"] = prevalence
+        record["persistence"] = persistence            
+        record["vertex_ip1_lat"] = vertex_ip1_lat
+        record["vertex_ip1_lng"] = vertex_ip1_lng
+        record["vertex_ip2_lat"] = vertex_ip2_lat
+        record["vertex_ip2_lng"] = vertex_ip2_lng
+        record["hopCount"] = hopCount
+
+        result[currentDst] = record
+    
+    return result
+    
+def getdailystatsforsrcip1(srcip):
+    
+    gi = pygeoip.GeoIP('GeoLiteCity.dat')
+    query = "SELECT * FROM traceroute WHERE srcip=\"" + str(srcip) + "\" ORDER BY hop ASC LIMIT 100"
+    
+    conn = sqlite3.connect('../data/dailystats.db')
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(query)
+    rows = cur.fetchall()
+    
+    result = {}    
+
+    visited = set()
+    
+    srcloc = gi.record_by_addr(srcip)
+    srcLat = srcloc['latitude']
+    srcLng = srcloc['longitude']
+
+    for rowOut in rows:
         currentDst = rowOut["dstip"]
 
         if currentDst in visited:
@@ -389,6 +502,29 @@ def getmonthlysrc():
     for row in rows:
         tempset = {}
         srcloc = gi.record_by_addr(row["srcip"])
+        tempset["srclat"] = srcloc['latitude']
+        tempset["srclng"] = srcloc['longitude']
+        result[row["srcip"]] = tempset
+
+    return result
+
+
+def getdailysrc():
+    
+    gi = pygeoip.GeoIP('GeoLiteCity.dat')
+    
+    query = "SELECT DISTINCT srcip FROM traceroute LIMIT 20"
+    conn = sqlite3.connect('../data/dailystats.db')
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(query)
+    rows = cur.fetchall()
+    result = {}
+    for row in rows:
+        tempset = {}
+        srcloc = gi.record_by_addr(row["srcip"])
+        if srcloc == None:
+            continue
         tempset["srclat"] = srcloc['latitude']
         tempset["srclng"] = srcloc['longitude']
         result[row["srcip"]] = tempset

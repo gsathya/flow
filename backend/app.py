@@ -34,6 +34,11 @@ def monthly():
     path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'frontend'))
     return send_from_directory(path, "monthly.html")
 
+@app.route("/daily")
+def daily():
+    path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'frontend'))
+    return send_from_directory(path, "daily.html")
+
 @app.route("/monthlystats", methods=['GET'])
 def get():
     srcip = request.args.get('srcip')
@@ -49,6 +54,19 @@ def get():
 @app.route("/monthlysrc")
 def getmonthlysrc():
     data = db.getmonthlysrc()
+    result = jsonify(data)
+    return result
+
+# Return a deduplicated set of src ips
+@app.route("/dailysrc")
+def getdailysrc():
+    data = db.getdailysrc()
+    result = jsonify(data)
+    return result
+
+@app.route("/dailystats", methods=['GET'])
+def getdailystats():
+    data = db.getdailystatsforsrcip()
     result = jsonify(data)
     return result
 
