@@ -255,114 +255,125 @@ def getmonthlystatsforsrcip(srcip):
 def getmonthlystatsformac(mac):
    
     gi = pygeoip.GeoIP('GeoLiteCity.dat')
-    query = "SELECT * FROM monthlyData WHERE deviceid=\"" + str(mac) + "\""
-    print "Query: " + query
+    query = "SELECT srcip, count(*) AS c FROM monthlyDATA WHERE deviceid=\"" + str(mac) + "\"" + "GROUP BY srcip HAVING c>1 ORDER BY c DESC LIMIT 1"
+    print "Query1: " + query
     
     conn = sqlite3.connect('../data/monthlystats.db')
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     cur.execute(query)
+    srcipdata = cur.fetchone()
+    srcip = srcipdata["srcip"]
+    
+    query = "SELECT * FROM monthlyData WHERE deviceid=\"" + str(mac) + "\" AND srcip=\"" + str(srcip) + "\""
+    print "Query2: " + query
+
+    cur.execute(query)
     rows = cur.fetchall()
     
-    finalresult = {}
+    result = {}
     
-    avg_rtt = []
-    prevalence = []
-    persistence = []
-    hop = []
-    vertex_ip1_lat = []
-    vertex_ip1_lng = []
-    vertex_ip2_lat = []
-    vertex_ip2_lng = []
-    src_lat = []
-    src_lng = []
-    dst_lat = []
-    dst_lng = []
+    visited = set()
     
-    srcip = ''
-    dstip = ''
-    srcloc = ''
-    dstloc = ''
-    counter = 0
-    for row in rows:
-        tempsrc = row["srcip"]
-        tempdst = row["dstip"]
-        
-        if srcip == '' or dstip == '':
-            srcip = tempsrc
-            dstip = tempdst
-        
-        if srcloc == '' or srcip != tempsrc:
-            srcloc = gi.record_by_addr(srcip)
-        
-        if dstloc == '' or dstip != tempdst:
-            dstloc = gi.record_by_addr(dstip)
-        
-        if srcip != tempsrc or dstip != tempdst:
-            #for previous src and dst point
-            result = {}
-            result["srclat"] = srcloc['latitude']
-            result["srclng"] = srcloc['longitude']
-            result["dstlat"] = dstloc['latitude']
-            result["dstlng"] = dstloc['longitude']
-            result["avg_rtt"] = avg_rtt
-            result["prevalence"] = prevalence
-            result["persistence"] = persistence
-            result["hop"] = hop
-            result["vertex_ip1_lat"] = vertex_ip1_lat
-            result["vertex_ip1_lng"] = vertex_ip1_lng
-            result["vertex_ip2_lat"] = vertex_ip2_lat
-            result["vertex_ip2_lng"] = vertex_ip2_lng
-            finalresult[counter] = result
-            #reset
-            srcip = tempsrc
-            dstip = tempdst
-            avg_rtt = []
-            prevalence = []
-            persistence = []
-            hop = []
-            vertex_ip1_lat = []
-            vertex_ip1_lng = []
-            vertex_ip2_lat = []
-            vertex_ip2_lng = []
-            counter += 1
-        
-        #add values
-        avg_rtt.append(row["avg_rtt"])
-        prevalence.append(row["prevalence"])
-        persistence.append(row["persistence"])
-        hop.append(row["hop"])
-        if is_private(row["vertex_ip1"]):
-            ip1_loc = srcloc
-        else:
-            ip1_loc = gi.record_by_addr(row["vertex_ip1"])
-        if is_private(row["vertex_ip2"]):
-            ip2_loc = srcloc
-        else:
-            ip2_loc = gi.record_by_addr(row["vertex_ip2"])
-        vertex_ip1_lat.append(ip1_loc['latitude'])
-        vertex_ip1_lng.append(ip1_loc['longitude'])
-        vertex_ip2_lat.append(ip2_loc['latitude'])
-        vertex_ip2_lng.append(ip2_loc['longitude'])
+    srcloc = gi.record_by_addr(srcip)
+    srcLat = srcloc['latitude']
+    srcLng = srcloc['longitude']
     
-    if counter != 0:
-        #for last set of values
-        result = {}
-        result["srclat"] = srcloc['latitude']
-        result["srclng"] = srcloc['longitude']
-        result["dstlat"] = dstloc['latitude']
-        result["dstlng"] = dstloc['longitude']
-        result["avg_rtt"] = avg_rtt
-        result["prevalence"] = prevalence
-        result["persistence"] = persistence
-        result["hop"] = hop
-        result["vertex_ip1_lat"] = vertex_ip1_lat
-        result["vertex_ip1_lng"] = vertex_ip1_lng
-        result["vertex_ip2_lat"] = vertex_ip2_lat
-        result["vertex_ip2_lng"] = vertex_ip2_lng
-        finalresult[counter] = result
+    result["srcip"] = srcip
+    result["srcLat"] = srcLat;
+    result["srcLng"] = srcLng;
     
-    return finalresult
+    for rowOut in rows:
+        
+        currentDst = rowOut["dstip"]
+        
+        if currentDst in visited:
+            continue
+        visited.add(currentDst)
+        
+        dstloc = gi.record_by_addr(currentDst)
+        dstLat = dstloc['latitude']
+        dstLng = dstloc['longitude']
+        
+        record = {}
+        avg_rtt = []
+        prevalence = []
+        persistence = []
+        vertex_ip1_lat = []
+        vertex_ip1_lng = []
+        vertex_ip2_lat = []
+        vertex_ip2_lng = []
+        hopCount = 0
+        prevhop = 0
+        
+        for row in rows:
+            dstip = row["dstip"]
+            if dstip != currentDst:
+                continue
+            curhop = row["hop"]
+            vertex_ip1 = row["vertex_ip1"]
+            vertex_ip2 = row["vertex_ip2"]
+            if is_private(vertex_ip1):
+                ip1_loc = srcloc
+            else:
+                ip1_loc = gi.record_by_addr(vertex_ip1)
+            if is_private(vertex_ip2):
+                ip2_loc = dstloc
+            else:
+                ip2_loc = gi.record_by_addr(vertex_ip2)
+            # Missing hop
+            if curhop > prevhop + 1:
+                # At the beginning
+                if prevhop == 0:
+                    vertex_ip1_lat.append(srcLat)
+                    vertex_ip1_lng.append(srcLng)
+                # Somewhere in the middle
+                else:
+                    vertex_ip1_lat.append(vertex_ip2_lat[-1])
+                    vertex_ip1_lng.append(vertex_ip2_lng[-1])
+                vertex_ip2_lat.append(ip1_loc['latitude'])
+                vertex_ip2_lng.append(ip1_loc['longitude'])
+                avg_rtt.append('n/a')
+                prevalence.append('n/a')
+                persistence.append('n/a')
+                hopCount = hopCount + 1
+                prevhop = curhop
+            # This hop's vertices
+            vertex_ip1_lat.append(ip1_loc['latitude'])
+            vertex_ip1_lng.append(ip1_loc['longitude'])
+            vertex_ip2_lat.append(ip2_loc['latitude'])
+            vertex_ip2_lng.append(ip2_loc['longitude'])
+            avg_rtt.append(row["avg_rtt"])
+            prevalence.append(row["prevalence"])
+            persistence.append(row["persistence"])
+            hopCount = hopCount + 1
+            prevhop = curhop
+        
+        # Final hop is missing
+        if vertex_ip2_lat[-1] != dstLat or vertex_ip2_lng[-1] != dstLng:
+            vertex_ip1_lat.append(vertex_ip2_lat[-1])
+            vertex_ip1_lng.append(vertex_ip2_lng[-1])
+            vertex_ip2_lat.append(dstLat)
+            vertex_ip2_lng.append(dstLng)
+            avg_rtt.append('n/a')
+            prevalence.append('n/a')
+            persistence.append('n/a')
+            hopCount = hopCount + 1
+        
+        record["dstLat"] = dstloc['latitude']
+        record["dstLng"] = dstloc['longitude']
+        record["avg_rtt"] = avg_rtt
+        record["prevalence"] = prevalence
+        record["persistence"] = persistence
+        record["vertex_ip1_lat"] = vertex_ip1_lat
+        record["vertex_ip1_lng"] = vertex_ip1_lng
+        record["vertex_ip2_lat"] = vertex_ip2_lat
+        record["vertex_ip2_lng"] = vertex_ip2_lng
+        record["hopCount"] = hopCount
+        
+        result[currentDst] = record
+    
+    return result
 
 def getmonthlysrc():
     
