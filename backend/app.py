@@ -6,7 +6,8 @@ app = Flask(__name__)
 
 @app.route("/", methods=["GET"])
 def main():
-    return redirect(url_for("daily"))
+    path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'frontend'))
+    return send_from_directory(path, "index.html")
 
 @app.route("/css/<file>", methods=["GET"])
 def get_css(file):
